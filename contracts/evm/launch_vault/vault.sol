@@ -25,17 +25,20 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
   string public constant UNAUTHORIZED_ERR = '2'; // Not authorized to perform function
   string public constant UNREGISTERED_ASSET_ERR = '3'; // Asset not registered
   string public constant ASSET_DEPLOYMENT_ERR = '4'; // Asset deployment failed
-  string public constant ASSET_REMOVAL_ERR = '4'; // Deployed asset removal failed
+  string public constant ASSET_REMOVAL_ERR = '5'; // Deployed asset removal failed
+  string public constant WITHDRAWS_DISABLED_ERR = '6'; // Withdraws are disabled
 
   uint public constant INITIAL_LIQUIDITY_MULTIPLIER = 100;
   bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
 
   mapping(IERC20 => PoolInfo) private pools;
   mapping(address => UserInfo) private users;
+  bool private withdrawsEnabled;
 
   function initialize() public initializer {
     AccessControlUpgradeable.__AccessControl_init();
     AccessControlUpgradeable._grantRole(OWNER_ROLE, msg.sender);
+    withdrawsEnabled = false;
   }
 
   function registerAsset(IERC20 asset, BlackwingVaultToken vaultToken, IDeployer deployer) public {
@@ -50,6 +53,16 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
   function updateDeployer(IERC20 asset, IDeployer deployer) public {
     require(hasRole(OWNER_ROLE, msg.sender), UNAUTHORIZED_ERR);
     pools[asset].deployer = deployer;
+  }
+
+  function enableWithdrawals() public {
+    require(hasRole(OWNER_ROLE, msg.sender), UNAUTHORIZED_ERR);
+    withdrawsEnabled = true;
+  }
+
+  function disableWithdrawals() public {
+    require(hasRole(OWNER_ROLE, msg.sender), UNAUTHORIZED_ERR);
+    withdrawsEnabled = false;
   }
 
   function deposit(IERC20 asset, uint amount) public {
@@ -78,6 +91,7 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
 
   function withdraw(IERC20 asset, uint vaultTokensToBurn) public {
     requireAssetRegistered(asset);
+    require(withdrawsEnabled, WITHDRAWS_DISABLED_ERR);
 
     PoolInfo memory pool = pools[asset];
     uint undeployedAmount = getUndeployedAmount(asset);

@@ -32,6 +32,7 @@ async function setup(): Promise<[
   await deployer.registerPool(mockAssetAddress, deployerLPTokenAddress);
 
   const vault = await deployBlackwingVaultContract();
+  await vault.enableWithdrawals();
   const vaultAddress = await vault.getAddress();
   const vaultToken = await deployBlackwingVaultTokenContract(vaultAddress);
   const vaultTokenAddress = await vaultToken.getAddress();
@@ -179,6 +180,23 @@ describe("Launch vaults", function () {
     expect(await mockAsset.balanceOf(addr2)).to.equal(10_090);
     expect(await vaultToken.totalSupply()).to.equal(totalInitialSupply);
     expect(await mockAsset.balanceOf(vault)).to.equal(2_910);
+  });
+
+  it("Should fail a withdrawal when withdrawals are disabled", async function () {
+    const [mockAsset, _deployerLPToken, _deployer, vault, vaultToken] = await setup();
+    await vault.disableWithdrawals();
+    const vaultAddress = await vault.getAddress();
+
+    const [_owner, addr1] = await ethers.getSigners();
+
+    await mockAsset.mint(addr1, 10_000);
+    await mockAsset.connect(addr1).approve(vaultAddress, 10_000);
+
+    const totalInitialSupply = await initialDeposit(addr1, vault, vaultToken, mockAsset, 1_000);
+    await expect(vault.connect(addr1).withdraw(mockAsset, totalInitialSupply)).to.be.rejectedWith(await vault.WITHDRAWS_DISABLED_ERR());
+    await vault.enableWithdrawals();
+    await vault.connect(addr1).withdraw(mockAsset, totalInitialSupply);
+    expect(await vault.hasWithdrawn(addr1)).to.equal(true);
   });
 
   it("Should mint/burn the correct amount of LP tokens when depositing/withdrawing increasing yield", async function () {
