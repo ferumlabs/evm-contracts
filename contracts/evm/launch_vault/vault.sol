@@ -19,10 +19,10 @@ struct UserInfo {
 }
 
 // The vault contract takes in user deposits and mints LP tokens for the user corresponding to their share
-// of the assets in the vault. The assets the vault accepts is resgitered by the owner of the vault contract.
+// of the assets in the vault. The assets the vault accepts is registered by the owner of the vault contract.
 //
-// Each vault asset is configured with an IDeployer which can deploy the assets to earn yield. Deployment and 
-// removal ("undeployment") of assets is triggered by the owner of the vault contract. The vault expects the 
+// Each vault asset is configured with an IDeployer which can deploy the assets to earn yield. Deployment and
+// removal ("undeployment") of assets is triggered by the owner of the vault contract. The vault expects the
 // IDeployer to mint rebasing tokens representing the assets deployed.
 
 contract BlackwingVault is Initializable, AccessControlUpgradeable {
@@ -36,6 +36,8 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
   string public constant ASSET_REMOVAL_ERR = '6'; // Deployed asset removal failed
   string public constant WITHDRAWS_DISABLED_ERR = '7'; // Withdraws are disabled
   string public constant MIN_BLOCKS_SINCE_LAST_DEPOSIT_ERR = '8'; // Min number of blocks since last deposit not reached for withdrawal
+  string public constant ASSET_TRANSFER_TO_USER_ON_WITHDRAW_ERR = '9'; // Transfer of withdrawn assets to user failed
+  string public constant ASSET_TRANSFER_FROM_USER_ON_DEPOSIT_ERR = '9'; // Transfer of deposited assets from user failed
 
   uint public constant INITIAL_LIQUIDITY_MULTIPLIER = 100;
   bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
@@ -58,12 +60,13 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
     pools[asset] = PoolInfo({
       isValue: true,
       vaultToken: vaultToken,
-      deployer: deployer  
+      deployer: deployer
     });
   }
 
   function updateDeployer(IERC20 asset, IDeployer deployer) public {
     require(hasRole(OWNER_ROLE, msg.sender), UNAUTHORIZED_ERR);
+    requireAssetRegistered(asset);
     pools[asset].deployer = deployer;
   }
 
@@ -100,7 +103,7 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
       vaultTokensToMint = amount * totalVaultTokenSupply / totalAssetBalance;
     }
     require(vaultTokensToMint > 0, VAULT_TOKEN_GRANULARITY_ERR);
-    asset.transferFrom(msg.sender, address(this), amount);
+    require(asset.transferFrom(msg.sender, address(this), amount), ASSET_TRANSFER_FROM_USER_ON_DEPOSIT_ERR);
     pool.vaultToken.mint(msg.sender, vaultTokensToMint);
     if (!users[msg.sender].isValue) {
       users[msg.sender] = UserInfo({isValue: true, lastDepositBlock: block.number});
@@ -120,10 +123,10 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
 
     PoolInfo memory pool = pools[asset];
     uint undeployedAmount = getUndeployedAmount(asset);
-    
+
     uint totalAssetBalance = getTotalAssetAmount(asset);
     uint totalVaultTokenSupply = pool.vaultToken.totalSupply();
-    // - totalAssetBalance can get large emough (because of yield) that it causes overflows. This is pretty 
+    // - totalAssetBalance can get large enough (because of yield) that it causes overflows. This is pretty
     //   unlikely to happen though - uint256 is a gigantic number.
     uint amountReturned = vaultTokensToBurn * totalAssetBalance / totalVaultTokenSupply;
     require(amountReturned > 0, VAULT_TOKEN_GRANULARITY_ERR);
@@ -136,9 +139,14 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
       pool.deployer.remove(asset, diff);
     }
     pool.vaultToken.burn(msg.sender, vaultTokensToBurn);
-    asset.transfer(msg.sender, amountReturned);
+    require(asset.transfer(msg.sender, amountReturned), ASSET_TRANSFER_TO_USER_ON_WITHDRAW_ERR);
 
     emit BalanceChange(false, address(asset), msg.sender, amountReturned);
+  }
+
+  function vaultTokenAddress(IERC20 asset) public view returns (address) {
+    requireAssetRegistered(asset);
+    return address(pools[asset].vaultToken);
   }
 
   function balance(IERC20 asset, address user) public view returns (uint) {

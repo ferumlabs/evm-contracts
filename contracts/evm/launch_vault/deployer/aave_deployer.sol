@@ -40,10 +40,10 @@ contract BlackwingAaveDeployer is AccessControl, IDeployer {
     AccessControl._grantRole(VAULT_ROLE, vault);
   }
 
-  function whitelistAsset(IERC20 asset, IPoolAddressesProvider pap) public onlyRole(OWNER_ROLE) {
+  function whitelistAsset(IERC20 asset, IPoolAddressesProvider pap) public {
     require(hasRole(OWNER_ROLE, msg.sender), UNAUTHORIZED_ERR);
     require(
-      aaveRegistry.getAddressesProviderIdByAddress(address(pap)) > 0, 
+      aaveRegistry.getAddressesProviderIdByAddress(address(pap)) > 0,
       INVALID_POOL_ADDRESS_PROVIDER_ERR
     );
     IAToken aToken = IAToken(IPool(pap.getPool()).getReserveData(address(asset)).aTokenAddress);
@@ -52,13 +52,14 @@ contract BlackwingAaveDeployer is AccessControl, IDeployer {
     pools[asset] = PoolInfo(aToken, pap, true);
   }
 
-  function deploy(IERC20 asset, uint amount) public onlyRole(VAULT_ROLE) {
+  function deploy(IERC20 asset, uint amount) public {
+    require(hasRole(VAULT_ROLE, msg.sender), UNAUTHORIZED_ERR);
     requireAssetWhitelisted(asset);
     IPool pool = IPool(pools[asset].pap.getPool());
     pool.supply(address(asset), amount, msg.sender, 0);
   }
 
-  function remove(IERC20 asset, uint amount) public onlyRole(VAULT_ROLE) {
+  function remove(IERC20 asset, uint amount) public {
     require(hasRole(VAULT_ROLE, msg.sender), UNAUTHORIZED_ERR);
     requireAssetWhitelisted(asset);
     PoolInfo memory info = pools[asset];

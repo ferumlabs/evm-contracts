@@ -90,6 +90,11 @@ async function mockDeployedYield(
 }
 
 describe("Launch vaults", function () {
+  it("Vault token address", async function () {
+    const [mockAsset, _deployerLPToken, _deployer, vault, vaultToken] = await setup();
+    expect(await vault.vaultTokenAddress(mockAsset)).to.equal(await vaultToken.getAddress());
+  });
+
   it("Only owner allowed to update deployer", async function () {
     const [mockAsset, _deployerLPToken, _deployer, vault, _vaultToken] = await setup();
 

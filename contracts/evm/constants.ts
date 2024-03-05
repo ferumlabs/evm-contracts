@@ -1,4 +1,3 @@
-export const BlackwingContractName = "BlackwingMach1";
 export const VaultContractName = "BlackwingVault";
 export const VaultTokenContractName = "BlackwingVaultToken";
 export const AaveDeployerContractName = "BlackwingAaveDeployer";

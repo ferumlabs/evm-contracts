@@ -21,8 +21,8 @@ describe("Aave deployer", function () {
       deployer
         .connect(addr)
         .registerVault(await vault.getAddress()))
-        .to.be
-        .rejectedWith(await deployer.UNAUTHORIZED_ERR());
+      .to.be
+      .rejectedWith(await deployer.UNAUTHORIZED_ERR());
     await deployer
       .connect(owner)
       .registerVault(await vault.getAddress());
@@ -52,7 +52,7 @@ describe("Aave deployer", function () {
     const [_owner, _addr] = await ethers.getSigners();
 
     await expect(deployer.whitelistAsset(await otherMockAsset.getAddress(), provider)).to.be.
-      rejectedWith(await deployer.INVALID_ATOKEN_ERR());
+    rejectedWith(await deployer.INVALID_ATOKEN_ERR());
   });
 
   it("Pool token", async function () {
@@ -70,17 +70,17 @@ describe("Aave deployer", function () {
     const [mockAsset, _aToken, _pool, registry, provider] = await deployAave();
     const otherMockAsset = await deployMockCoin();
     const deployer = await deployAaveDeployer(registry);
-    const vault = await deployBlackwingVaultContract();
+
+    const [owner, vault] = await ethers.getSigners();
+    await otherMockAsset.mint(owner, 10_000);
+
     await deployer.registerVault(await vault.getAddress());
     await deployer.whitelistAsset(await mockAsset.getAddress(), provider);
 
-    const [owner] = await ethers.getSigners();
-    await otherMockAsset.mint(owner, 10_000);
-
-    await expect(deployer.deploy(await otherMockAsset.getAddress(), 1_000)).to.be.
-      rejectedWith(await deployer.UNREGISTERED_ASSET_ERR());
-    await expect(deployer.remove(await otherMockAsset.getAddress(), 1_000)).to.be.
-      rejectedWith(await deployer.UNREGISTERED_ASSET_ERR());
+    await expect(deployer.connect(vault).deploy(await otherMockAsset.getAddress(), 1_000)).to.be.
+    rejectedWith(await deployer.UNREGISTERED_ASSET_ERR());
+    await expect(deployer.connect(vault).remove(await otherMockAsset.getAddress(), 1_000)).to.be.
+    rejectedWith(await deployer.UNREGISTERED_ASSET_ERR());
   });
 
   it("Deploy and withdraw", async function () {
@@ -105,7 +105,7 @@ describe("Aave deployer", function () {
 
     // Remove requires caller to first transfer the aTokens to the deployer.
     await expect(deployer.connect(vault).remove(mockAssetAddress, 500)).to.be.
-      rejectedWith(await deployer.NOT_ENOUGH_ATOKENS_TO_BURN());
+    rejectedWith(await deployer.NOT_ENOUGH_ATOKENS_TO_BURN());
     await aToken.connect(vault).transfer(deployerAddress, 500);
     expect(await aToken.balanceOf(vault)).to.equal(500);
     await deployer.connect(vault).remove(mockAssetAddress, 500);

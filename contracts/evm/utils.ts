@@ -4,7 +4,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { PoolAddressesProviderRegistry } from '@ferum/aave-deploy-v3';
 import { BaseContract } from "ethers";
 import {
-  BlackwingContractName,
   VaultContractName,
   VaultTokenContractName,
   AaveDeployerContractName,
@@ -20,13 +19,6 @@ import {
 export function uuid(): Buffer {
   let id: string = uuidv4();
   return Buffer.from(id.replaceAll('-', ''), 'hex')
-}
-
-export async function deployBlackwingContract(): Promise<contracts.evm.blackwingSol.BlackwingMach1> {
-  const factory = await ethers.getContractFactory(BlackwingContractName);
-  const contract = await upgrades.deployProxy(factory, []);
-  await contract.waitForDeployment();
-  return await ethers.getContractAt(BlackwingContractName, await contract.getAddress());
 }
 
 export async function deployBlackwingVaultContract(): Promise<contracts.evm.launchVault.vaultSol.BlackwingVault> {
