@@ -15,6 +15,8 @@ struct PoolInfo {
   bool isValue;
 }
 
+// Implements the IDeployer interface to deploy assets by supplying them to Aave lending pools.
+
 contract BlackwingAaveDeployer is AccessControl, IDeployer {
   string public constant UNREGISTERED_ASSET_ERR = '1'; // Asset not registered
   string public constant UNAUTHORIZED_ERR = '2'; // Not authorized to perform function

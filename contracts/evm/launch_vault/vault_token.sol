@@ -5,6 +5,9 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 
+// LP token representing share of the assets in the vault. Should be non transferrable unless configured 
+// to be via `transferable`.
+
 contract BlackwingVaultToken is ERC20Upgradeable, AccessControlUpgradeable {
   string public constant TRANSFERS_DISABLED_ERR = '1'; // Transfers are disabled
   string public constant UNAUTHORIZED_ERR = '2'; // Not authorized to perform function

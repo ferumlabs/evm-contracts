@@ -18,6 +18,13 @@ struct UserInfo {
   uint lastDepositBlock;
 }
 
+// The vault contract takes in user deposits and mints LP tokens for the user corresponding to their share
+// of the assets in the vault. The assets the vault accepts is resgitered by the owner of the vault contract.
+//
+// Each vault asset is configured with an IDeployer which can deploy the assets to earn yield. Deployment and 
+// removal ("undeployment") of assets is triggered by the owner of the vault contract. The vault expects the 
+// IDeployer to mint rebasing tokens representing the assets deployed.
+
 contract BlackwingVault is Initializable, AccessControlUpgradeable {
   event BalanceChange(bool isDeposit, address asset, address user, uint amount);
 
@@ -140,6 +147,9 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
     PoolInfo memory pool = pools[asset];
     uint vaultTokenBalance = pool.vaultToken.balanceOf(user);
     uint vaultTokenSupply = pool.vaultToken.totalSupply();
+    if (vaultTokenSupply == 0) {
+      return 0;
+    }
     uint totalAssetBalance = getTotalAssetAmount(asset);
     return vaultTokenBalance * totalAssetBalance / vaultTokenSupply;
   }
