@@ -1,20 +1,21 @@
 import { ethers, upgrades } from "hardhat";
-import { contracts, IERC20 } from "../../hardhat_artifacts/types";
+import { contracts } from "../../hardhat_artifacts/types";
 import { v4 as uuidv4 } from 'uuid';
 import { PoolAddressesProviderRegistry } from '@ferum/aave-deploy-v3';
 import { BaseContract } from "ethers";
-
-export const BlackwingContractName = "BlackwingMach1";
-export const VaultContractName = "BlackwingVault";
-export const VaultTokenContractName = "BlackwingVaultToken";
-export const AaveDeployerContractName = "BlackwingAaveDeployer";
-export const MockContractName = "MockContract";
-export const MockCoinContractName = "MockCoin";
-export const MockATokenContractName = "MockAToken";
-export const MockDeplyerContractName = "MockDeployer";
-export const MockAavePool = "MockAavePool";
-export const MockAaveAddressProvider = "MockAaveAddressProvider";
-export const MockAaveRegistry = "MockAaveRegistry";
+import {
+  BlackwingContractName,
+  VaultContractName,
+  VaultTokenContractName,
+  AaveDeployerContractName,
+  MockContractName,
+  MockCoinContractName,
+  MockATokenContractName,
+  MockDeplyerContractName,
+  MockAavePool,
+  MockAaveAddressProvider,
+  MockAaveRegistry,
+} from "@/contracts/evm/constants"
 
 export function uuid(): Buffer {
   let id: string = uuidv4();
@@ -30,7 +31,7 @@ export async function deployBlackwingContract(): Promise<contracts.evm.blackwing
 
 export async function deployBlackwingVaultContract(): Promise<contracts.evm.launchVault.vaultSol.BlackwingVault> {
   const factory = await ethers.getContractFactory(VaultContractName);
-  const contract = await upgrades.deployProxy(factory, []);
+  const contract = await upgrades.deployProxy(factory, [0]);
   await contract.waitForDeployment();
   return await ethers.getContractAt(VaultContractName, await contract.getAddress());
 }
@@ -48,8 +49,8 @@ export async function deployMockContract(): Promise<contracts.evm.tests.mockCont
   return await ethers.getContractAt(MockContractName, await contract.getAddress());
 }
 
-export async function deployMockCoin(): Promise<contracts.evm.tests.mockCoinSol.MockCoin> {
-  const contract = await ethers.deployContract(MockCoinContractName, ["MockCoin", "MCOIN"]);
+export async function deployMockCoin(decimals: number = 18): Promise<contracts.evm.tests.mockCoinSol.MockCoin> {
+  const contract = await ethers.deployContract(MockCoinContractName, ["MockCoin", "MCOIN", decimals]);
   await contract.waitForDeployment();
   return await ethers.getContractAt(MockCoinContractName, await contract.getAddress());
 }
@@ -73,8 +74,7 @@ export async function deployAave(): Promise<[
   contracts.evm.tests.mockAaveSol.MockAaveRegistry,
   contracts.evm.tests.mockAaveSol.MockAaveAddressProvider,
 ]> {
-  const mockToken = await ethers.deployContract(MockCoinContractName, ["MockCoin", "MCOIN"]);
-  await mockToken.waitForDeployment();
+  const mockToken = await deployMockCoin();
   const mockAToken = await ethers.deployContract(MockATokenContractName, [await mockToken.getAddress()]);
   await mockAToken.waitForDeployment();
   const mockPool = await ethers.deployContract(

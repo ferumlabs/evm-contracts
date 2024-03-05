@@ -15,7 +15,7 @@ struct PoolInfo {
 
 struct UserInfo {
   bool isValue;
-  bool withdrawn;
+  uint lastDepositBlock;
 }
 
 contract BlackwingVault is Initializable, AccessControlUpgradeable {
@@ -24,9 +24,11 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
   string public constant VAULT_TOKEN_GRANULARITY_ERR = '1'; // Not enough assets provided to mint one vault token unit
   string public constant UNAUTHORIZED_ERR = '2'; // Not authorized to perform function
   string public constant UNREGISTERED_ASSET_ERR = '3'; // Asset not registered
-  string public constant ASSET_DEPLOYMENT_ERR = '4'; // Asset deployment failed
-  string public constant ASSET_REMOVAL_ERR = '5'; // Deployed asset removal failed
-  string public constant WITHDRAWS_DISABLED_ERR = '6'; // Withdraws are disabled
+  string public constant REGISTERED_ASSET_ERR = '4'; // Asset already registered
+  string public constant ASSET_DEPLOYMENT_ERR = '5'; // Asset deployment failed
+  string public constant ASSET_REMOVAL_ERR = '6'; // Deployed asset removal failed
+  string public constant WITHDRAWS_DISABLED_ERR = '7'; // Withdraws are disabled
+  string public constant MIN_BLOCKS_SINCE_LAST_DEPOSIT_ERR = '8'; // Min number of blocks since last deposit not reached for withdrawal
 
   uint public constant INITIAL_LIQUIDITY_MULTIPLIER = 100;
   bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
@@ -34,15 +36,18 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
   mapping(IERC20 => PoolInfo) private pools;
   mapping(address => UserInfo) private users;
   bool private withdrawsEnabled;
+  uint private minBlocksSinceLastDeposit;
 
-  function initialize() public initializer {
+  function initialize(uint _minBlocksSinceLastDeposit) public initializer {
     AccessControlUpgradeable.__AccessControl_init();
     AccessControlUpgradeable._grantRole(OWNER_ROLE, msg.sender);
     withdrawsEnabled = false;
+    minBlocksSinceLastDeposit = _minBlocksSinceLastDeposit;
   }
 
   function registerAsset(IERC20 asset, BlackwingVaultToken vaultToken, IDeployer deployer) public {
     require(hasRole(OWNER_ROLE, msg.sender), UNAUTHORIZED_ERR);
+    require(!pools[asset].isValue, REGISTERED_ASSET_ERR);
     pools[asset] = PoolInfo({
       isValue: true,
       vaultToken: vaultToken,
@@ -65,6 +70,11 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
     withdrawsEnabled = false;
   }
 
+  function setMinBlocksSinceLastDeposit(uint _minBlocksSinceLastDeposit) public {
+    require(hasRole(OWNER_ROLE, msg.sender), UNAUTHORIZED_ERR);
+    minBlocksSinceLastDeposit = _minBlocksSinceLastDeposit;
+  }
+
   function deposit(IERC20 asset, uint amount) public {
     requireAssetRegistered(asset);
 
@@ -85,6 +95,11 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
     require(vaultTokensToMint > 0, VAULT_TOKEN_GRANULARITY_ERR);
     asset.transferFrom(msg.sender, address(this), amount);
     pool.vaultToken.mint(msg.sender, vaultTokensToMint);
+    if (!users[msg.sender].isValue) {
+      users[msg.sender] = UserInfo({isValue: true, lastDepositBlock: block.number});
+    } else {
+      users[msg.sender].lastDepositBlock = block.number;
+    }
 
     emit BalanceChange(true, address(asset), msg.sender, amount);
   }
@@ -92,6 +107,9 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
   function withdraw(IERC20 asset, uint vaultTokensToBurn) public {
     requireAssetRegistered(asset);
     require(withdrawsEnabled, WITHDRAWS_DISABLED_ERR);
+
+    UserInfo memory user = users[msg.sender];
+    require(block.number > user.lastDepositBlock + minBlocksSinceLastDeposit, MIN_BLOCKS_SINCE_LAST_DEPOSIT_ERR);
 
     PoolInfo memory pool = pools[asset];
     uint undeployedAmount = getUndeployedAmount(asset);
@@ -112,11 +130,6 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
     }
     pool.vaultToken.burn(msg.sender, vaultTokensToBurn);
     asset.transfer(msg.sender, amountReturned);
-    if (!users[msg.sender].isValue) {
-      users[msg.sender] = UserInfo({isValue: true, withdrawn: true});
-    } else {
-      users[msg.sender].withdrawn = true;
-    }
 
     emit BalanceChange(false, address(asset), msg.sender, amountReturned);
   }
@@ -180,7 +193,7 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
     return asset.balanceOf(address(this));
   }
 
-  function hasWithdrawn(address user) public view returns (bool) {
-    return users[user].withdrawn;
+  function lastDepositBlock(address user) public view returns (uint) {
+    return users[user].lastDepositBlock;
   }
 }

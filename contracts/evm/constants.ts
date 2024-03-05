@@ -1,0 +1,11 @@
+export const BlackwingContractName = "BlackwingMach1";
+export const VaultContractName = "BlackwingVault";
+export const VaultTokenContractName = "BlackwingVaultToken";
+export const AaveDeployerContractName = "BlackwingAaveDeployer";
+export const MockContractName = "MockContract";
+export const MockCoinContractName = "MockCoin";
+export const MockATokenContractName = "MockAToken";
+export const MockDeplyerContractName = "MockDeployer";
+export const MockAavePool = "MockAavePool";
+export const MockAaveAddressProvider = "MockAaveAddressProvider";
+export const MockAaveRegistry = "MockAaveRegistry";

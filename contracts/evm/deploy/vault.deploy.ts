@@ -1,13 +1,15 @@
 import { env, NODE } from '@/env';
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
 import { DeployFunction, TxOptions } from 'hardhat-deploy/types';
-import { 
-  VaultContractName, 
-  VaultTokenContractName, 
+import {
+  VaultContractName,
+  VaultTokenContractName,
   MockCoinContractName,
-  deployMockDeployer,
+} from '../constants';
+import {
+  deployMockDeployer
 } from '../utils';
-import { MockCoin, MockDeployer } from '@/hardhat_artifacts/types';
+import { MockCoin } from '@/hardhat_artifacts/types';
 import ProxyAdmin from 'hardhat-deploy/extendedArtifacts/ProxyAdmin.json';
 
 const deploy: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
@@ -35,10 +37,10 @@ const nodeDeploy: DeployFunction = async function (hre: HardhatRuntimeEnvironmen
   const deployerContract = await deployMockDeployer();
   const deployerAddress = await deployerContract.getAddress();
 
-  const wethContract = await deployMockCoin(hre, localVaultDeployerName, "WETH", "WETH");
+  const wethContract = await deployMockCoin(hre, localVaultDeployerName, "WETH", "WETH", 18);
   const wethAddress = await wethContract.getAddress();
   console.log("Depolyed WETH to", wethAddress);
-  const usdcContract = await deployMockCoin(hre, localVaultDeployerName, "USDC", "USDC");
+  const usdcContract = await deployMockCoin(hre, localVaultDeployerName, "USDC", "USDC", 6);
   const usdcAddress = await usdcContract.getAddress();
   console.log("Depolyed USDC to", usdcAddress);
 
@@ -55,7 +57,7 @@ const nodeDeploy: DeployFunction = async function (hre: HardhatRuntimeEnvironmen
       execute: {
         init: {
           methodName: "initialize",
-          args: [],
+          args: [0],
         },
       },
     },
@@ -105,6 +107,16 @@ const nodeDeploy: DeployFunction = async function (hre: HardhatRuntimeEnvironmen
   await vaultContract.
     connect(localVaultDeployer).
     registerAsset(usdcAddress, vaultTokenUSDCDeployment.address, deployerAddress);
+  const usdcDeployerToken = await deployMockCoin(hre, localVaultDeployerName, "USDC Deployer Token", "deployerUSDC", 18);
+  await deployerContract.registerPool(
+    usdcAddress,
+    await usdcDeployerToken.getAddress(),
+  );
+  const wethDeployerToken = await deployMockCoin(hre, localVaultDeployerName, "WETH Deployer Token", "deployerWETH", 18);
+  await deployerContract.registerPool(
+    wethAddress,
+    await wethDeployerToken.getAddress(),
+  );
 
   console.log("Deploy finished");
 };
@@ -123,13 +135,14 @@ async function deployMockCoin(
   from: TxOptions['from'],
   name: string,
   symbol: string,
+  decimals: number
  ): Promise<MockCoin> {
   const { deploy } = hre.deployments;
 
   const deployment = await deploy(MockCoinContractName, {
     from,
     log: true,
-    args: [name, symbol],
+    args: [name, symbol, decimals],
   });
   return await hre.ethers.getContractAt(MockCoinContractName, deployment.address);
 }

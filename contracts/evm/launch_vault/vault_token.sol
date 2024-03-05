@@ -19,6 +19,7 @@ contract BlackwingVaultToken is ERC20Upgradeable, AccessControlUpgradeable {
     AccessControlUpgradeable.__AccessControl_init();
     AccessControlUpgradeable._grantRole(VAULT_ROLE, _vault);
     vault = _vault;
+    transferable = false;
   }
 
   function getVaultAddress() public view returns (address) {

@@ -1,7 +1,7 @@
 import { env, ETHERNAL_NODE } from '@/env';
 import { HardhatRuntimeEnvironment } from 'hardhat/types';
 import { DeployFunction } from 'hardhat-deploy/types';
-import { BlackwingContractName } from '../utils';
+import { BlackwingContractName } from '../constants';
 import ProxyAdmin from 'hardhat-deploy/extendedArtifacts/ProxyAdmin.json';
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {

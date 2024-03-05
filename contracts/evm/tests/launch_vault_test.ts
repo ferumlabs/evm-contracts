@@ -15,6 +15,7 @@ import {
 } from "../utils";
 import { ethers } from "hardhat";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { mine } from "@nomicfoundation/hardhat-network-helpers";
 
 async function setup(): Promise<[
   MockCoin, // Mock asset
@@ -58,6 +59,8 @@ async function initialDeposit(
   expect(vaultTokenBalance).to.equal(amount * initMultiplier);
   const totalSupply = await vaultToken.totalSupply();
   expect(totalSupply).to.equal(amount * initMultiplier);
+  const lastBlockDeposited = await vault.lastDepositBlock(account);
+  expect(lastBlockDeposited).to.equal(tx.blockNumber);
   return amount * initMultiplier;
 }
 
@@ -114,6 +117,29 @@ describe("Launch vaults", function () {
     await vault.registerAsset(newAsset, newVaultToken, deployer);
   });
 
+  it("Only owner allowed to set min blocks since last deposit", async function () {
+    const [_mockAsset, _deployerLPToken, deployer, vault, _vaultToken] = await setup();
+
+    const [_owner, addr1] = await ethers.getSigners();
+
+    await expect(vault.connect(addr1).setMinBlocksSinceLastDeposit(100)).to.be.rejectedWith(await vault.UNAUTHORIZED_ERR());
+
+    await vault.setMinBlocksSinceLastDeposit(100);
+  });
+
+  it("Should fail when trying to register an already registered asset", async function () {
+    const [_mockAsset, _deployerLPToken, deployer, vault, _vaultToken] = await setup();
+    const newAsset = await deployMockCoin();
+
+    const newVaultToken = await deployBlackwingVaultTokenContract(await vault.getAddress());
+
+    const [_owner, addr1] = await ethers.getSigners();
+
+    await vault.registerAsset(newAsset, newVaultToken, deployer);
+
+    await expect(vault.registerAsset(newAsset, newVaultToken, deployer)).to.be.rejectedWith(await vault.REGISTERED_ASSET_ERR());
+  });
+
   it("Should fail when trying to deposit using an unregistered asset", async function () {
     const [mockAsset, _deployerLPToken, _deployer, vault, vaultToken] = await setup();
     const vaultAddress = await vault.getAddress();
@@ -139,6 +165,24 @@ describe("Launch vaults", function () {
     await mockAsset.approve(vaultAddress, 10_000);
 
     await initialDeposit(owner, vault, vaultToken, mockAsset, 1);
+  });
+
+  it("Should update last deposit block", async function () {
+    const [mockAsset, _deployerLPToken, _deployer, vault, vaultToken] = await setup();
+    const vaultAddress = await vault.getAddress();
+    const [_owner, addr1] = await ethers.getSigners();
+
+    await mockAsset.mint(addr1, 10_000);
+    await mockAsset.connect(addr1).approve(vaultAddress, 10_000);
+    await initialDeposit(addr1, vault, vaultToken, mockAsset, 1_000);
+    await mine(1000)
+
+    const initialLastBlockDeposited = await vault.lastDepositBlock(addr1);
+
+    const tx = await vault.connect(addr1).deposit(mockAsset, 2_000);
+    const lastBlockDeposited = await vault.lastDepositBlock(addr1);
+    expect(lastBlockDeposited).to.equal(tx.blockNumber);
+    expect(lastBlockDeposited - initialLastBlockDeposited).to.be.greaterThanOrEqual(1000)
   });
 
   it("Should emit deposit withdrawal events", async function () {
@@ -173,10 +217,8 @@ describe("Launch vaults", function () {
     expect(await mockAsset.balanceOf(vault)).to.equal(3_200);
 
     await expect(vault.connect(addr2).withdraw(mockAsset, 10_001)).to.be.rejected;
-    expect(await vault.hasWithdrawn(addr2)).to.equal(false);
     const withdrawTx = await vault.connect(addr2).withdraw(mockAsset, 10_000);
     expect(withdrawTx).to.emit(vault, "BalanceChange").withArgs(false, addr2, mockAsset, 90);
-    expect(await vault.hasWithdrawn(addr2)).to.equal(true);
     expect(await mockAsset.balanceOf(addr2)).to.equal(10_090);
     expect(await vaultToken.totalSupply()).to.equal(totalInitialSupply);
     expect(await mockAsset.balanceOf(vault)).to.equal(2_910);
@@ -196,7 +238,23 @@ describe("Launch vaults", function () {
     await expect(vault.connect(addr1).withdraw(mockAsset, totalInitialSupply)).to.be.rejectedWith(await vault.WITHDRAWS_DISABLED_ERR());
     await vault.enableWithdrawals();
     await vault.connect(addr1).withdraw(mockAsset, totalInitialSupply);
-    expect(await vault.hasWithdrawn(addr1)).to.equal(true);
+  });
+
+  it("Should fail a withdrawal when not enough blocks have been passed", async function () {
+    const [mockAsset, _deployerLPToken, _deployer, vault, vaultToken] = await setup();
+    const vaultAddress = await vault.getAddress();
+
+    const [_owner, addr1] = await ethers.getSigners();
+
+    await vault.setMinBlocksSinceLastDeposit(5_000)
+    await mockAsset.mint(addr1, 10_000);
+    await mockAsset.connect(addr1).approve(vaultAddress, 10_000);
+
+    const totalInitialSupply = await initialDeposit(addr1, vault, vaultToken, mockAsset, 1_000);
+    await expect(vault.connect(addr1).withdraw(mockAsset, totalInitialSupply)).to.be.rejectedWith(await vault.MIN_BLOCKS_SINCE_LAST_DEPOSIT_ERR());
+    await mine(5_000)
+
+    await vault.connect(addr1).withdraw(mockAsset, totalInitialSupply);
   });
 
   it("Should mint/burn the correct amount of LP tokens when depositing/withdrawing increasing yield", async function () {
@@ -229,9 +287,7 @@ describe("Launch vaults", function () {
     expect(await mockAsset.balanceOf(vault)).to.equal(3_200);
 
     await expect(vault.connect(addr2).withdraw(mockAsset, 10_001)).to.be.rejected;
-    expect(await vault.hasWithdrawn(addr2)).to.equal(false);
     await vault.connect(addr2).withdraw(mockAsset, 10_000);
-    expect(await vault.hasWithdrawn(addr2)).to.equal(true);
     expect(await mockAsset.balanceOf(addr2)).to.equal(10_090);
     expect(await vaultToken.totalSupply()).to.equal(totalInitialSupply);
     expect(await mockAsset.balanceOf(vault)).to.equal(2_910);
@@ -267,9 +323,7 @@ describe("Launch vaults", function () {
     expect(await mockAsset.balanceOf(vault)).to.equal(450);
 
     await expect(vault.connect(addr2).withdraw(mockAsset, 40_001)).to.be.rejected;
-    expect(await vault.hasWithdrawn(addr2)).to.equal(false);
     await vault.connect(addr2).withdraw(mockAsset, 40_000)
-    expect(await vault.hasWithdrawn(addr2)).to.equal(true);
     expect(await mockAsset.balanceOf(addr2)).to.equal(9_928);
     expect(await vaultToken.totalSupply()).to.equal(totalInitialSupply);
     expect(await mockAsset.balanceOf(vault)).to.equal(322);
@@ -306,9 +360,7 @@ describe("Launch vaults", function () {
     expect(await mockAsset.balanceOf(vault)).to.equal(500);
 
     await expect(vault.connect(addr2).withdraw(mockAsset, 10_001)).to.be.rejected;
-    expect(await vault.hasWithdrawn(addr2)).to.equal(false);
     await vault.connect(addr2).withdraw(mockAsset, 10_000);
-    expect(await vault.hasWithdrawn(addr2)).to.equal(true);
     expect(await mockAsset.balanceOf(addr2)).to.equal(10_090);
     expect(await vaultToken.totalSupply()).to.equal(totalInitialSupply);
     expect(await mockAsset.balanceOf(vault)).to.equal(210);
@@ -346,9 +398,7 @@ describe("Launch vaults", function () {
     expect(await mockAsset.balanceOf(vault)).to.equal(450);
 
     await expect(vault.connect(addr2).withdraw(mockAsset, 40_001)).to.be.rejected;
-    expect(await vault.hasWithdrawn(addr2)).to.equal(false);
     await vault.connect(addr2).withdraw(mockAsset, 40_000);
-    expect(await vault.hasWithdrawn(addr2)).to.equal(true);
     expect(await mockAsset.balanceOf(addr2)).to.equal(9_928);
     expect(await vaultToken.totalSupply()).to.equal(totalInitialSupply);
     expect(await mockAsset.balanceOf(vault)).to.equal(322);
