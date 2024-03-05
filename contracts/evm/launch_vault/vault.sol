@@ -4,6 +4,7 @@ pragma solidity ^0.8.23;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {BlackwingVaultToken} from "./vault_token.sol";
 import {IDeployer} from "./deployer/deployer_interface.sol";
 
@@ -26,6 +27,8 @@ struct UserInfo {
 // IDeployer to mint rebasing tokens representing the assets deployed.
 
 contract BlackwingVault is Initializable, AccessControlUpgradeable {
+  using SafeERC20 for IERC20;
+
   event BalanceChange(bool isDeposit, address asset, address user, uint amount);
 
   string public constant VAULT_TOKEN_GRANULARITY_ERR = '1'; // Not enough assets provided to mint one vault token unit
@@ -36,8 +39,6 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
   string public constant ASSET_REMOVAL_ERR = '6'; // Deployed asset removal failed
   string public constant WITHDRAWS_DISABLED_ERR = '7'; // Withdraws are disabled
   string public constant MIN_BLOCKS_SINCE_LAST_DEPOSIT_ERR = '8'; // Min number of blocks since last deposit not reached for withdrawal
-  string public constant ASSET_TRANSFER_TO_USER_ON_WITHDRAW_ERR = '9'; // Transfer of withdrawn assets to user failed
-  string public constant ASSET_TRANSFER_FROM_USER_ON_DEPOSIT_ERR = '9'; // Transfer of deposited assets from user failed
 
   uint public constant INITIAL_LIQUIDITY_MULTIPLIER = 100;
   bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
@@ -103,7 +104,7 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
       vaultTokensToMint = amount * totalVaultTokenSupply / totalAssetBalance;
     }
     require(vaultTokensToMint > 0, VAULT_TOKEN_GRANULARITY_ERR);
-    require(asset.transferFrom(msg.sender, address(this), amount), ASSET_TRANSFER_FROM_USER_ON_DEPOSIT_ERR);
+    asset.safeTransferFrom(msg.sender, address(this), amount);
     pool.vaultToken.mint(msg.sender, vaultTokensToMint);
     if (!users[msg.sender].isValue) {
       users[msg.sender] = UserInfo({isValue: true, lastDepositBlock: block.number});
@@ -134,12 +135,12 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
       address poolToken = pool.deployer.poolToken(asset);
       uint diff = amountReturned - undeployedAmount;
       if (poolToken != address(0)) {
-        require(IERC20(poolToken).transfer(address(pool.deployer), diff), ASSET_REMOVAL_ERR);
+        IERC20(poolToken).safeTransfer(address(pool.deployer), diff);
       }
       pool.deployer.remove(asset, diff);
     }
     pool.vaultToken.burn(msg.sender, vaultTokensToBurn);
-    require(asset.transfer(msg.sender, amountReturned), ASSET_TRANSFER_TO_USER_ON_WITHDRAW_ERR);
+    asset.safeTransfer(msg.sender, amountReturned);
 
     emit BalanceChange(false, address(asset), msg.sender, amountReturned);
   }
@@ -167,7 +168,7 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
     requireAssetRegistered(asset);
 
     PoolInfo memory pool = pools[asset];
-    require(asset.transfer(address(pool.deployer), amount), ASSET_DEPLOYMENT_ERR);
+    asset.safeTransfer(address(pool.deployer), amount);
     pool.deployer.deploy(asset, amount);
   }
 
@@ -178,7 +179,7 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
     IDeployer deployer = pools[asset].deployer;
     address poolToken = deployer.poolToken(asset);
     if (poolToken != address(0)) {
-      require(IERC20(poolToken).transfer(address(deployer), amount), ASSET_REMOVAL_ERR);
+      IERC20(poolToken).safeTransfer(address(deployer), amount);
     }
     deployer.remove(asset, amount);
   }
