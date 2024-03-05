@@ -19,3 +19,5 @@ hardhat_cache/
 hardhat_abi/
 hardhat_deployments/localhost
 ignition/
+coverage.json
+coverage/

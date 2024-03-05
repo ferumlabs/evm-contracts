@@ -10,3 +10,7 @@
 You can run a local node via `HARDHAT_CHAIN_ID=<chain_id> npm run hardhat-node -- --port <port>`. 
 
 This local node will have mock versions of the contracts deployed. 
+
+### Test Coverage
+
+Run `npx hardhat coverage` to get a test coverage report.

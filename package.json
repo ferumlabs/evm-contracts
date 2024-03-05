@@ -43,7 +43,7 @@
     "hardhat-deploy-ethers": "^0.4.1",
     "hardhat-ethernal": "^3.2.5",
     "hardhat-gas-reporter": "^1.0.10",
-    "solidity-coverage": "^0.8.6",
+    "solidity-coverage": "^0.8.8",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.3.3",

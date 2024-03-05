@@ -97,6 +97,7 @@ describe("Aave deployer", function () {
     // Only allowed to deploy from registered vault address;
     expect(deployer.deploy(mockAssetAddress, 1_000)).to.be.rejectedWith(await deployer.UNAUTHORIZED_ERR());
     await deployer.connect(vault).deploy(mockAssetAddress, 1_000);
+    expect(await deployer.connect(vault).totalDeployedAmount(mockAssetAddress)).to.equal(1_000);
 
     // Deploy should transfer the aTokens to the caller of the deploy method.
     expect(await aToken.balanceOf(vault)).to.equal(1_000);

@@ -156,6 +156,17 @@ describe("Launch vaults", function () {
     await expect(vault.deposit(mockAsset2, 1_000)).to.be.rejectedWith(await vault.UNREGISTERED_ASSET_ERR());
   });
 
+  it("Balance with no deployed assets", async function () {
+    const [mockAsset, _deployerLPToken, _deployer, vault, _vaultToken] = await setup();
+    const vaultAddress = await vault.getAddress();
+    const [owner] = await ethers.getSigners();
+
+    await mockAsset.mint(owner, 10_000);
+    await mockAsset.approve(vaultAddress, 10_000);
+
+    expect(await vault.balance(mockAsset, owner)).to.equal(0);
+  });
+
   it("Initial liquidity with only 1 token", async function () {
     const [mockAsset, _deployerLPToken, _deployer, vault, vaultToken] = await setup();
     const vaultAddress = await vault.getAddress();
@@ -567,6 +578,12 @@ describe("Launch vaults asset deployments", function () {
 });
 
 describe("Vault tokens", function () {
+  it("Vault token vault address", async function () {
+    const [mockAsset, _deployerLPToken, _deployer, vault, vaultToken] = await setup();
+    const vaultAddress = await vault.getAddress();
+    expect(await vaultToken.getVaultAddress()).to.equal(vaultAddress);
+  });
+
   it("Vault token transfer only allowed to change via vault and owner", async function () {
     const [mockAsset, _deployerLPToken, _deployer, vault, vaultToken] = await setup();
 
@@ -574,6 +591,8 @@ describe("Vault tokens", function () {
 
     await expect(vaultToken.enableTransfers()).to.be.rejectedWith(await vaultToken.UNAUTHORIZED_ERR());
     await expect(vault.connect(addr1).enableLPTransfers(mockAsset)).to.be.rejectedWith(await vault.UNAUTHORIZED_ERR());
+    await vault.enableLPTransfers(mockAsset);
+    await vault.disableLPTransfers(mockAsset);
     await vault.enableLPTransfers(mockAsset);
     await expect(vaultToken.disableTransfers()).to.be.rejectedWith(await vaultToken.UNAUTHORIZED_ERR());
     await expect(vault.connect(addr1).disableLPTransfers(mockAsset)).to.be.rejectedWith(await vault.UNAUTHORIZED_ERR());
@@ -615,10 +634,13 @@ describe("Vault tokens", function () {
     await initialDeposit(addr1, vault, vaultToken, mockAsset, 100);
 
     await expect(vaultToken.connect(addr1).transfer(addr2, 100)).to.be.rejectedWith(await vaultToken.TRANSFERS_DISABLED_ERR());
+    await expect(vaultToken.connect(addr1).transferFrom(addr1, addr2, 100)).to.be.rejectedWith(await vaultToken.TRANSFERS_DISABLED_ERR());
 
     await vault.enableLPTransfers(mockAsset);
 
-    await vaultToken.connect(addr1).transfer(addr2, 100);
+    await vaultToken.connect(addr1).transfer(addr2, 150);
+    vaultToken.connect(addr2).approve(addr1, 50);
+    await vaultToken.connect(addr1).transferFrom(addr2, addr1, 50);
     expect(await vaultToken.balanceOf(addr2)).to.equal(100);
 
     await vault.disableLPTransfers(mockAsset);
