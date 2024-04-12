@@ -48,6 +48,11 @@ contract BlackwingVault is Initializable, AccessControlUpgradeable {
   bool private withdrawsEnabled;
   uint private minBlocksSinceLastDeposit;
 
+  /// @custom:oz-upgrades-unsafe-allow constructor
+  constructor() {
+    _disableInitializers();
+  }
+
   function initialize(uint _minBlocksSinceLastDeposit) public initializer {
     AccessControlUpgradeable.__AccessControl_init();
     AccessControlUpgradeable._grantRole(OWNER_ROLE, msg.sender);

@@ -17,6 +17,11 @@ contract BlackwingVaultToken is ERC20Upgradeable, AccessControlUpgradeable {
   address private vault;
   bool private transferable;
 
+  /// @custom:oz-upgrades-unsafe-allow constructor
+  constructor() {
+    _disableInitializers();
+  }
+
   function initialize(address _vault, string memory name, string memory symbol) public initializer {
     ERC20Upgradeable.__ERC20_init(name, symbol);
     AccessControlUpgradeable.__AccessControl_init();
