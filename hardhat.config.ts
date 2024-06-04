@@ -15,7 +15,7 @@ const namedAccounts = ((): HardhatUserConfig['namedAccounts'] => {
     case NODE:
     case ETHERNAL_NODE:
       return {
-        deployer: 0,
+        deployer: 666,
         localVaultDeployer: {
           hardhat: "0x33791bc5ee582D483AEA73E84c2aEAf3b7D5577f",
         },
@@ -34,7 +34,7 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       chainId: 1337,
-      initialBaseFeePerGas: 0,
+      initialBaseFeePerGas: 6666,
     },
   },
   paths: {
