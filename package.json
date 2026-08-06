@@ -4,7 +4,8 @@
   "description": "L2 for X",
   "main": "index.js",
   "scripts": {
-    "hardhat-node": "ENV=node npx hardhat node"
+    "hardhat-node": "ENV=node npx hardhat node",
+    "test": "hardhat test"
   },
   "repository": {
     "type": "git",
@@ -22,6 +23,7 @@
     "@ferum/aave-deploy-v3": "^1.55.11",
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.4",
     "@nomicfoundation/hardhat-ethers": "^3.0.5",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
     "@nomicfoundation/hardhat-verify": "^2.0.4",
     "@openzeppelin/contracts": "^5.0.1",
@@ -29,6 +31,7 @@
     "@openzeppelin/hardhat-upgrades": "^3.0.1",
     "@openzeppelin/test-environment": "^0.1.9",
     "@symblox/hardhat-abi-gen": "^0.2.0",
+    "@typechain/ethers-v6": "^0.5.1",
     "@typechain/hardhat": "^9.1.0",
     "@types/chai": "^4.3.11",
     "@types/mocha": "^10.0.6",
@@ -46,6 +49,7 @@
     "solidity-coverage": "^0.8.8",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
+    "typechain": "^8.3.2",
     "typescript": "^5.3.3",
     "uuid": "^9.0.1"
   }
