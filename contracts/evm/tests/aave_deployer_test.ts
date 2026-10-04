@@ -36,9 +36,10 @@ describe("Aave deployer", function () {
 
     const [_owner, addr] = await ethers.getSigners();
 
+    const unauthorizedError = await deployer.UNAUTHORIZED_ERR();
     await expect(
       deployer.connect(addr).whitelistAsset(await mockAsset.getAddress(), provider)
-    ).to.be.rejectedWith(await deployer.UNAUTHORIZED_ERR());
+    ).to.be.rejectedWith(unauthorizedError);
     await deployer.whitelistAsset(await mockAsset.getAddress(), provider);
   });
 
@@ -51,8 +52,8 @@ describe("Aave deployer", function () {
 
     const [_owner, _addr] = await ethers.getSigners();
 
-    await expect(deployer.whitelistAsset(await otherMockAsset.getAddress(), provider)).to.be.
-    rejectedWith(await deployer.INVALID_ATOKEN_ERR());
+    const invalidAtokenError = await deployer.INVALID_ATOKEN_ERR();
+    await expect(deployer.whitelistAsset(await otherMockAsset.getAddress(), provider)).to.be.rejectedWith(invalidAtokenError);
   });
 
   it("Pool token", async function () {
@@ -63,7 +64,8 @@ describe("Aave deployer", function () {
     await deployer.registerVault(await vault.getAddress());
     await deployer.whitelistAsset(await mockAsset.getAddress(), provider);
     expect(await deployer.poolToken(mockAsset)).to.equal(await aToken.getAddress());
-    await expect(deployer.poolToken(otherMockAsset)).to.be.rejectedWith(await deployer.UNREGISTERED_ASSET_ERR());
+    const unregisteredAssetError = await deployer.UNREGISTERED_ASSET_ERR();
+    await expect(deployer.poolToken(otherMockAsset)).to.be.rejectedWith(unregisteredAssetError);
   });
 
   it("Deploy / withdraw unregistered asset", async function () {
@@ -77,10 +79,9 @@ describe("Aave deployer", function () {
     await deployer.registerVault(await vault.getAddress());
     await deployer.whitelistAsset(await mockAsset.getAddress(), provider);
 
-    await expect(deployer.connect(vault).deploy(await otherMockAsset.getAddress(), 1_000)).to.be.
-    rejectedWith(await deployer.UNREGISTERED_ASSET_ERR());
-    await expect(deployer.connect(vault).remove(await otherMockAsset.getAddress(), 1_000)).to.be.
-    rejectedWith(await deployer.UNREGISTERED_ASSET_ERR());
+    const unregisteredAssetError = await deployer.UNREGISTERED_ASSET_ERR();
+    await expect(deployer.connect(vault).deploy(await otherMockAsset.getAddress(), 1_000)).to.be.rejectedWith(unregisteredAssetError);
+    await expect(deployer.connect(vault).remove(await otherMockAsset.getAddress(), 1_000)).to.be.rejectedWith(unregisteredAssetError);
   });
 
   it("Deploy and withdraw", async function () {
@@ -95,7 +96,8 @@ describe("Aave deployer", function () {
     await mockAsset.mint(deployerAddress, 10_000);
 
     // Only allowed to deploy from registered vault address;
-    expect(deployer.deploy(mockAssetAddress, 1_000)).to.be.rejectedWith(await deployer.UNAUTHORIZED_ERR());
+    const unauthorizedError = await deployer.UNAUTHORIZED_ERR();
+    await expect(deployer.deploy(mockAssetAddress, 1_000)).to.be.rejectedWith(unauthorizedError);
     await deployer.connect(vault).deploy(mockAssetAddress, 1_000);
     expect(await deployer.connect(vault).totalDeployedAmount(mockAssetAddress)).to.equal(1_000);
 
@@ -104,8 +106,8 @@ describe("Aave deployer", function () {
     expect(await aToken.totalSupply()).to.equal(1_000);
 
     // Remove requires caller to first transfer the aTokens to the deployer.
-    await expect(deployer.connect(vault).remove(mockAssetAddress, 500)).to.be.
-    rejectedWith(await deployer.NOT_ENOUGH_ATOKENS_TO_BURN());
+    const notEnoughAtokensToBurnError = await deployer.NOT_ENOUGH_ATOKENS_TO_BURN();
+    await expect(deployer.connect(vault).remove(mockAssetAddress, 500)).to.be.rejectedWith(notEnoughAtokensToBurnError);
     await aToken.connect(vault).transfer(deployerAddress, 500);
     expect(await aToken.balanceOf(vault)).to.equal(500);
     await deployer.connect(vault).remove(mockAssetAddress, 500);
@@ -113,6 +115,6 @@ describe("Aave deployer", function () {
     expect(await aToken.totalSupply()).to.equal(500);
 
     // Only the vault is allowed to remove.
-    await expect(deployer.remove(mockAssetAddress, 200)).to.be.rejectedWith(await deployer.UNAUTHORIZED_ERR());
+    await expect(deployer.remove(mockAssetAddress, 200)).to.be.rejectedWith(unauthorizedError);
   });
 });

@@ -52,7 +52,7 @@ async function initialDeposit(
   const initMultiplier = parseInt((await vault.INITIAL_LIQUIDITY_MULTIPLIER()).toString());
   const initialBalance = await asset.balanceOf(account);
   const tx = await vault.connect(account).deposit(asset, amount);
-  expect(tx).to.emit(vault, "BalanceChange").withArgs(true, account, asset, amount);
+  await expect(tx).to.emit(vault, "BalanceChange").withArgs(true, asset, account, amount);
   const mockAssetBalance = await asset.balanceOf(account);
   expect(mockAssetBalance).to.equal(parseInt(initialBalance.toString()) - amount);
   const vaultTokenBalance = await vaultToken.balanceOf(account);
@@ -104,7 +104,8 @@ describe("Launch vaults", function () {
 
     const [_owner, addr1] = await ethers.getSigners();
 
-    await expect(vault.connect(addr1).updateDeployer(mockAsset, newDeployer)).to.be.rejectedWith(await vault.UNAUTHORIZED_ERR());
+    const unauthorizedError = await vault.UNAUTHORIZED_ERR();
+    await expect(vault.connect(addr1).updateDeployer(mockAsset, newDeployer)).to.be.rejectedWith(unauthorizedError);
 
     await vault.updateDeployer(mockAsset, newDeployer)
   });
@@ -117,7 +118,8 @@ describe("Launch vaults", function () {
 
     const [_owner, addr1] = await ethers.getSigners();
 
-    await expect(vault.connect(addr1).registerAsset(newAsset, newVaultToken, deployer)).to.be.rejectedWith(await vault.UNAUTHORIZED_ERR());
+    const unauthorizedError = await vault.UNAUTHORIZED_ERR();
+    await expect(vault.connect(addr1).registerAsset(newAsset, newVaultToken, deployer)).to.be.rejectedWith(unauthorizedError);
 
     await vault.registerAsset(newAsset, newVaultToken, deployer);
   });
@@ -127,7 +129,8 @@ describe("Launch vaults", function () {
 
     const [_owner, addr1] = await ethers.getSigners();
 
-    await expect(vault.connect(addr1).setMinBlocksSinceLastDeposit(100)).to.be.rejectedWith(await vault.UNAUTHORIZED_ERR());
+    const unauthorizedError = await vault.UNAUTHORIZED_ERR();
+    await expect(vault.connect(addr1).setMinBlocksSinceLastDeposit(100)).to.be.rejectedWith(unauthorizedError);
 
     await vault.setMinBlocksSinceLastDeposit(100);
   });
@@ -142,7 +145,8 @@ describe("Launch vaults", function () {
 
     await vault.registerAsset(newAsset, newVaultToken, deployer);
 
-    await expect(vault.registerAsset(newAsset, newVaultToken, deployer)).to.be.rejectedWith(await vault.REGISTERED_ASSET_ERR());
+    const registeredAssetError = await vault.REGISTERED_ASSET_ERR();
+    await expect(vault.registerAsset(newAsset, newVaultToken, deployer)).to.be.rejectedWith(registeredAssetError);
   });
 
   it("Should fail when trying to deposit using an unregistered asset", async function () {
@@ -158,7 +162,8 @@ describe("Launch vaults", function () {
 
     await initialDeposit(owner, vault, vaultToken, mockAsset, 1_000);
 
-    await expect(vault.deposit(mockAsset2, 1_000)).to.be.rejectedWith(await vault.UNREGISTERED_ASSET_ERR());
+    const unregisteredAssetError = await vault.UNREGISTERED_ASSET_ERR();
+    await expect(vault.deposit(mockAsset2, 1_000)).to.be.rejectedWith(unregisteredAssetError);
   });
 
   it("Balance with no deployed assets", async function () {
@@ -217,7 +222,7 @@ describe("Launch vaults", function () {
     await mockYield(vault, mockAsset, 1_000);
 
     const depositTx = await vault.connect(addr2).deposit(mockAsset, 200);
-    expect(depositTx).to.emit(vault, "BalanceChange").withArgs(true, addr2, mockAsset, 200);
+    await expect(depositTx).to.emit(vault, "BalanceChange").withArgs(true, mockAsset, addr2, 200);
 
     expect(await vaultToken.totalSupply()).to.equal(10_000 + totalInitialSupply);
     expect(await vaultToken.balanceOf(addr2)).to.equal(10_000);
@@ -234,7 +239,7 @@ describe("Launch vaults", function () {
 
     await expect(vault.connect(addr2).withdraw(mockAsset, 10_001)).to.be.rejected;
     const withdrawTx = await vault.connect(addr2).withdraw(mockAsset, 10_000);
-    expect(withdrawTx).to.emit(vault, "BalanceChange").withArgs(false, addr2, mockAsset, 90);
+    await expect(withdrawTx).to.emit(vault, "BalanceChange").withArgs(false, mockAsset, addr2, 290);
     expect(await mockAsset.balanceOf(addr2)).to.equal(10_090);
     expect(await vaultToken.totalSupply()).to.equal(totalInitialSupply);
     expect(await mockAsset.balanceOf(vault)).to.equal(2_910);
@@ -251,7 +256,8 @@ describe("Launch vaults", function () {
     await mockAsset.connect(addr1).approve(vaultAddress, 10_000);
 
     const totalInitialSupply = await initialDeposit(addr1, vault, vaultToken, mockAsset, 1_000);
-    await expect(vault.connect(addr1).withdraw(mockAsset, totalInitialSupply)).to.be.rejectedWith(await vault.WITHDRAWS_DISABLED_ERR());
+    const withdrawsDisabledError = await vault.WITHDRAWS_DISABLED_ERR();
+    await expect(vault.connect(addr1).withdraw(mockAsset, totalInitialSupply)).to.be.rejectedWith(withdrawsDisabledError);
     await vault.enableWithdrawals();
     await vault.connect(addr1).withdraw(mockAsset, totalInitialSupply);
   });
@@ -267,7 +273,8 @@ describe("Launch vaults", function () {
     await mockAsset.connect(addr1).approve(vaultAddress, 10_000);
 
     const totalInitialSupply = await initialDeposit(addr1, vault, vaultToken, mockAsset, 1_000);
-    await expect(vault.connect(addr1).withdraw(mockAsset, totalInitialSupply)).to.be.rejectedWith(await vault.MIN_BLOCKS_SINCE_LAST_DEPOSIT_ERR());
+    const minBlocksSinceLastDepositError = await vault.MIN_BLOCKS_SINCE_LAST_DEPOSIT_ERR();
+    await expect(vault.connect(addr1).withdraw(mockAsset, totalInitialSupply)).to.be.rejectedWith(minBlocksSinceLastDepositError);
     await mine(5_000)
 
     await vault.connect(addr1).withdraw(mockAsset, totalInitialSupply);
@@ -395,7 +402,7 @@ describe("Launch vaults", function () {
 
     const totalInitialSupply = await initialDeposit(addr1, vault, vaultToken, mockAsset, 1_000);
 
-    vault.deployAssets(mockAsset, 750);
+    await vault.deployAssets(mockAsset, 750);
 
     await mockDeployedYield(vault, deployer, mockAsset, -500);
 
@@ -437,9 +444,11 @@ describe("Launch vaults", function () {
 
     // This call fails because the value of an LP token is too high for 1 unit of the underlying to equal
     // at least one unit of the LP token.
-    await expect(vault.connect(addr2).deposit(mockAsset, 1)).to.be.rejectedWith(await vault.VAULT_TOKEN_GRANULARITY_ERR());
+    const vaultTokenGranularityError = await vault.VAULT_TOKEN_GRANULARITY_ERR();
+    await expect(vault.connect(addr2).deposit(mockAsset, 1)).to.be.rejectedWith(vaultTokenGranularityError);
     // 10 units of the underlying is enough to mint at least 1 LP token.
-    vault.connect(addr2).deposit(mockAsset, 10)
+    await vault.connect(addr2).deposit(mockAsset, 10);
+    expect(await vaultToken.balanceOf(addr2)).to.be.greaterThan(0);
   });
 
   it("Vault token granularity on withdraw - negative yield", async function () {
@@ -459,9 +468,13 @@ describe("Launch vaults", function () {
 
     // This call fails because the value of an LP token is too low for 1 unit of the LP token to equal at least
     // 1 unit of the underlying asset.
-    await expect(vault.connect(addr2).withdraw(mockAsset, 1)).to.be.rejectedWith(await vault.VAULT_TOKEN_GRANULARITY_ERR());
+    const vaultTokenGranularityError = await vault.VAULT_TOKEN_GRANULARITY_ERR();
+    await expect(vault.connect(addr1).withdraw(mockAsset, 1)).to.be.rejectedWith(vaultTokenGranularityError);
     // The entire balance of the LP token is enough to withdraw at least 1 unit of the underlying.
-    vault.connect(addr2).withdraw(mockAsset, initialTotalSupply)
+    await vault.connect(addr1).withdraw(mockAsset, initialTotalSupply);
+    expect(await vaultToken.balanceOf(addr1)).to.equal(0);
+    expect(await mockAsset.balanceOf(addr1)).to.equal(991);
+    expect(await mockAsset.balanceOf(vault)).to.equal(0);
   });
 });
 
@@ -477,7 +490,8 @@ describe("Launch vaults asset deployments", function () {
 
     await initialDeposit(owner, vault, vaultToken, mockAsset, 1_000);
 
-    await expect(vault.deployAssets(mockAsset2, 1_000)).to.be.rejectedWith(await vault.UNREGISTERED_ASSET_ERR());
+    const unregisteredAssetError = await vault.UNREGISTERED_ASSET_ERR();
+    await expect(vault.deployAssets(mockAsset2, 1_000)).to.be.rejectedWith(unregisteredAssetError);
   });
 
   it("Only owner allowed to deploy/remove", async function () {
@@ -490,9 +504,10 @@ describe("Launch vaults asset deployments", function () {
 
     await initialDeposit(owner, vault, vaultToken, mockAsset, 1_000);
 
-    await expect(vault.connect(addr1).deployAssets(mockAsset, 500)).to.be.rejectedWith(await vault.UNAUTHORIZED_ERR());
+    const unauthorizedError = await vault.UNAUTHORIZED_ERR();
+    await expect(vault.connect(addr1).deployAssets(mockAsset, 500)).to.be.rejectedWith(unauthorizedError);
     await vault.deployAssets(mockAsset, 1_000);
-    await expect(vault.connect(addr1).removeAssets(mockAsset, 500)).to.be.rejectedWith(await vault.UNAUTHORIZED_ERR());
+    await expect(vault.connect(addr1).removeAssets(mockAsset, 500)).to.be.rejectedWith(unauthorizedError);
   });
 
   it("Deployment fails when trying to deploy too much", async function () {
@@ -540,18 +555,18 @@ describe("Launch vaults asset deployments", function () {
     await initialDeposit(addr1, vault, vaultToken, mockAsset, 1_000);
 
     expect(await deployerLPToken.totalSupply()).to.equal(0);
-    expect(await vault.deployAssets(mockAsset, 700)).to.emit(deployer, "Deployed").withArgs(mockAsset, 700);
+    await expect(await vault.deployAssets(mockAsset, 700)).to.emit(deployer, "Deployed").withArgs(mockAsset, 700);
     expect(await mockAsset.balanceOf(vault)).to.equal(300);
 
     expect(await deployerLPToken.balanceOf(vault)).to.equal(700);
     await mockDeployedYield(vault, deployer, mockAsset, 1_000);
-    expect(await vault.removeAssets(mockAsset, 800)).to.emit(deployer, "Removed").withArgs(mockAsset, 800);
+    await expect(await vault.removeAssets(mockAsset, 800)).to.emit(deployer, "Removed").withArgs(mockAsset, 800);
     expect(await deployerLPToken.balanceOf(vault)).to.equal(900);
     expect(await mockAsset.balanceOf(vault)).to.equal(1_100);
 
-    expect(await vault.deployAssets(mockAsset, 200)).to.emit(deployer, "Deployed").withArgs(mockAsset, 200);
+    await expect(await vault.deployAssets(mockAsset, 200)).to.emit(deployer, "Deployed").withArgs(mockAsset, 200);
     expect(await mockAsset.balanceOf(vault)).to.equal(900);
-    expect(await vault.removeAssets(mockAsset, 1_100)).to.emit(deployer, "Removed").withArgs(mockAsset, 1_100);
+    await expect(await vault.removeAssets(mockAsset, 1_100)).to.emit(deployer, "Removed").withArgs(mockAsset, 1_100);
     expect(await mockAsset.balanceOf(vault)).to.equal(2_000);
   });
 
@@ -571,12 +586,12 @@ describe("Launch vaults asset deployments", function () {
     await initialDeposit(addr1, vault, vaultToken, mockAsset, 1_000);
 
     expect(await deployerLPToken.totalSupply()).to.equal(0);
-    expect(await vault.deployAssets(mockAsset, 700)).to.emit(deployer, "Deployed").withArgs(mockAsset, 700);
+    await expect(await vault.deployAssets(mockAsset, 700)).to.emit(deployer, "Deployed").withArgs(mockAsset, 700);
     expect(await deployerLPToken.balanceOf(vault)).to.equal(700);
     expect(await mockAsset.balanceOf(vault)).to.equal(300);
 
     expect(await vaultToken.balanceOf(addr1)).to.equal(100_000);
-    expect(await vault.connect(addr1).withdraw(mockAsset, 50_000)).to.emit(deployer, "Removed").withArgs(mockAsset, 200);
+    await expect(await vault.connect(addr1).withdraw(mockAsset, 50_000)).to.emit(deployer, "Removed").withArgs(mockAsset, 200);
     expect(await deployerLPToken.balanceOf(vault)).to.equal(500);
     expect(await mockAsset.balanceOf(vault)).to.equal(0);
   });
@@ -594,20 +609,23 @@ describe("Vault tokens", function () {
 
     const [_owner, addr1] = await ethers.getSigners();
 
-    await expect(vaultToken.enableTransfers()).to.be.rejectedWith(await vaultToken.UNAUTHORIZED_ERR());
-    await expect(vault.connect(addr1).enableLPTransfers(mockAsset)).to.be.rejectedWith(await vault.UNAUTHORIZED_ERR());
+    const vaultTokenUnauthorizedError = await vaultToken.UNAUTHORIZED_ERR();
+    await expect(vaultToken.enableTransfers()).to.be.rejectedWith(vaultTokenUnauthorizedError);
+    const vaultUnauthorizedError = await vault.UNAUTHORIZED_ERR();
+    await expect(vault.connect(addr1).enableLPTransfers(mockAsset)).to.be.rejectedWith(vaultUnauthorizedError);
     await vault.enableLPTransfers(mockAsset);
     await vault.disableLPTransfers(mockAsset);
     await vault.enableLPTransfers(mockAsset);
-    await expect(vaultToken.disableTransfers()).to.be.rejectedWith(await vaultToken.UNAUTHORIZED_ERR());
-    await expect(vault.connect(addr1).disableLPTransfers(mockAsset)).to.be.rejectedWith(await vault.UNAUTHORIZED_ERR());
+    await expect(vaultToken.disableTransfers()).to.be.rejectedWith(vaultTokenUnauthorizedError);
+    await expect(vault.connect(addr1).disableLPTransfers(mockAsset)).to.be.rejectedWith(vaultUnauthorizedError);
   });
 
   it("Vault token transfer fails for unregistered asset", async function () {
     const [_mockAsset, _deployerLPToken, _deployer, vault, _vaultToken] = await setup();
     const mockAsset2 = await deployMockCoin();
 
-    await expect(vault.disableLPTransfers(mockAsset2)).to.be.rejectedWith(await vault.UNREGISTERED_ASSET_ERR());
+    const unregisteredAssetError = await vault.UNREGISTERED_ASSET_ERR();
+    await expect(vault.disableLPTransfers(mockAsset2)).to.be.rejectedWith(unregisteredAssetError);
   });
 
   it("Vault token mint/burn only allowed to change via vault", async function () {
@@ -616,13 +634,14 @@ describe("Vault tokens", function () {
 
     const [owner] = await ethers.getSigners();
 
-    await expect(vaultToken.mint(owner, 100)).to.be.rejectedWith(await vaultToken.UNAUTHORIZED_ERR());
+    const unauthorizedError = await vaultToken.UNAUTHORIZED_ERR();
+    await expect(vaultToken.mint(owner, 100)).to.be.rejectedWith(unauthorizedError);
 
     await mockAsset.approve(vaultAddress, 1_000);
     await mockAsset.mint(owner, 1_000);
     await initialDeposit(owner, vault, vaultToken, mockAsset, 100);
 
-    await expect(vaultToken.burn(owner, 10)).to.be.rejectedWith(await vaultToken.UNAUTHORIZED_ERR());
+    await expect(vaultToken.burn(owner, 10)).to.be.rejectedWith(unauthorizedError);
   });
 
   it("Vault token not transferrable unless enabled", async function () {
@@ -638,8 +657,9 @@ describe("Vault tokens", function () {
 
     await initialDeposit(addr1, vault, vaultToken, mockAsset, 100);
 
-    await expect(vaultToken.connect(addr1).transfer(addr2, 100)).to.be.rejectedWith(await vaultToken.TRANSFERS_DISABLED_ERR());
-    await expect(vaultToken.connect(addr1).transferFrom(addr1, addr2, 100)).to.be.rejectedWith(await vaultToken.TRANSFERS_DISABLED_ERR());
+    const transfersDisabledError = await vaultToken.TRANSFERS_DISABLED_ERR();
+    await expect(vaultToken.connect(addr1).transfer(addr2, 100)).to.be.rejectedWith(transfersDisabledError);
+    await expect(vaultToken.connect(addr1).transferFrom(addr1, addr2, 100)).to.be.rejectedWith(transfersDisabledError);
 
     await vault.enableLPTransfers(mockAsset);
 
@@ -650,6 +670,6 @@ describe("Vault tokens", function () {
 
     await vault.disableLPTransfers(mockAsset);
 
-    await expect(vaultToken.connect(addr1).transfer(addr2, 100)).to.be.rejectedWith(await vaultToken.TRANSFERS_DISABLED_ERR());
+    await expect(vaultToken.connect(addr1).transfer(addr2, 100)).to.be.rejectedWith(transfersDisabledError);
   });
 });
